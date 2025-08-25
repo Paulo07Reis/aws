@@ -1,11 +1,15 @@
 # Integração API Gatway, Lambda e DynamoDB
 
+<br>
+
 ## 🔧 Pré-requisitos
 
 - Conta AWS ativa
 - Tabela no DynamoDB: **`telemetria_http`**
     - **Partition key:** `deviceId` *(String)*
     - **Sort key:** `ts` *(Number)*
+
+<br>
 
 ## 🖥️ Passo 1 — Criar a função Lambda
 
@@ -14,6 +18,8 @@
     - `TABLE_NAME=telemetria_http`
 
 O script da lambda está no arquivo lambda_handler.py
+
+<br>
 
 ## 🌐 Passo 2 — Criar a API Gateway (REST)
 
@@ -25,6 +31,8 @@ Acesse API Gateway → Create API → REST API (Build)
 - Faça o deploy: Deploy API
 - Stage: dev
 - Copie o Invoke URL gerado
+
+<br>
 
 ## 🧪 Passo 3 — Testar a API
 Payload de exemplo
@@ -44,6 +52,8 @@ Payload de exemplo
     -H "Content-Type: application/json" \
     -d '{"deviceId":"edge-01","temp":25.1,"hum":61}'
 
+<br>
+
 ## ✅ Passo 4 — Validar o fluxo
 
 No DynamoDB: 
@@ -54,6 +64,9 @@ No API Gateway:
 - Consultar os logs de execução (se habilitados)
 
 - Confirmar resposta HTTP 200 com {"status":"ok"}
+
+
+<br>
 
 ## 🏁 Critérios de sucesso
 
