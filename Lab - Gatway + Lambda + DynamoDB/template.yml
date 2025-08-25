@@ -1,0 +1,98 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: API Gateway + Lambda + DynamoDB (Telemetria)
+
+Resources:
+  TelemetriaTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: telemetria_http
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: deviceId
+          AttributeType: S
+        - AttributeName: ts
+          AttributeType: N
+      KeySchema:
+        - AttributeName: deviceId
+          KeyType: HASH
+        - AttributeName: ts
+          KeyType: RANGE
+
+  TelemetriaLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: DynamoDBAccess
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:PutItem
+                  - dynamodb:GetItem
+                  - dynamodb:UpdateItem
+                Resource: !GetAtt TelemetriaTable.Arn
+
+  TelemetriaLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: TelemetriaLambda
+      Handler: lambda_handler.lambda_handler
+      Runtime: python3.12
+      Role: !GetAtt TelemetriaLambdaRole.Arn
+      Environment:
+        Variables:
+          TABLE_NAME: telemetria_http
+      Code:
+        S3Bucket: meu-bucket
+        S3Key: lambda/lambda_handler.zip
+
+  TelemetriaApi:
+    Type: AWS::ApiGateway::RestApi
+    Properties:
+      Name: TelemetriaAPI
+
+  TelemetriaResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      ParentId: !GetAtt TelemetriaApi.RootResourceId
+      PathPart: telemetria
+      RestApiId: !Ref TelemetriaApi
+
+  TelemetriaMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref TelemetriaApi
+      ResourceId: !Ref TelemetriaResource
+      HttpMethod: POST
+      AuthorizationType: NONE
+      Integration:
+        IntegrationHttpMethod: POST
+        Type: AWS_PROXY
+        Uri:
+          Fn::Sub:
+            - arn:aws:apigateway:${Region}:lambda:path/2015-03-31/functions/${LambdaArn}/invocations
+            - { Region: !Ref "AWS::Region", LambdaArn: !GetAtt TelemetriaLambda.Arn }
+
+  TelemetriaPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref TelemetriaLambda
+      Principal: apigateway.amazonaws.com
+
+  TelemetriaDeployment:
+    Type: AWS::ApiGateway::Deployment
+    DependsOn: TelemetriaMethod
+    Properties:
+      RestApiId: !Ref TelemetriaApi
+      StageName: dev
